@@ -1,5 +1,5 @@
 use std::ops;
-use wiggle_ai::*;
+use wiggle_ml::*;
 
 #[derive(Debug)]
 struct N {
@@ -34,12 +34,7 @@ struct Xor {
 }
 
 impl Xor {
-    const TRAIN: [[Float; 3]; 4] = [
-        [0., 0., 0.],
-        [0., 1., 1.],
-        [1., 0., 1.],
-        [1., 1., 0.]
-    ];
+    const TRAIN: [[Float; 3]; 4] = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
 
     fn new() -> Self {
         Self {
@@ -64,10 +59,10 @@ impl Xor {
     // Basically this function call pushs data through one layer of neurons
     fn forward(&self, x1: Float, x2: Float) -> Float {
         // this is now the x1 input for 'and' neuron
-        let or_out = sigmoidf(self.or.w1 * x1 + self.or.w2 * x2 + self.or.b);
+        let or_out = sigmoid(self.or.w1 * x1 + self.or.w2 * x2 + self.or.b);
         // and this is the x2 input for 'and' neuron
-        let nand_out = sigmoidf(self.nand.w1 * x1 + self.nand.w2 * x2 + self.nand.b);
-        sigmoidf(self.and.w1 * or_out + self.and.w2 * nand_out + self.and.b)
+        let nand_out = sigmoid(self.nand.w1 * x1 + self.nand.w2 * x2 + self.nand.b);
+        sigmoid(self.and.w1 * or_out + self.and.w2 * nand_out + self.and.b)
     }
 
     fn cost(&self) -> Float {

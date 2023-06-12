@@ -1,32 +1,12 @@
-use wiggle_ai::*;
+use wiggle_ml::*;
 
-const OR: [[Float; 3]; 4] = [
-    [0., 0., 0.],
-    [0., 1., 1.],
-    [1., 0., 1.],
-    [1., 1., 1.],
-];
+const OR: [[Float; 3]; 4] = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 1.]];
 
-const _AND: [[Float; 3]; 4] = [
-    [0., 0., 0.],
-    [0., 1., 0.],
-    [1., 0., 0.],
-    [1., 1., 1.],
-];
+const _AND: [[Float; 3]; 4] = [[0., 0., 0.], [0., 1., 0.], [1., 0., 0.], [1., 1., 1.]];
 
-const _NAND: [[Float; 3]; 4] = [
-    [0., 0., 1.],
-    [0., 1., 1.],
-    [1., 0., 1.],
-    [1., 1., 0.],
-];
+const _NAND: [[Float; 3]; 4] = [[0., 0., 1.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
 
-const _XOR: [[Float; 3]; 4] = [
-    [0., 0., 0.],
-    [0., 1., 1.],
-    [1., 0., 1.],
-    [1., 1., 0.],
-];
+const _XOR: [[Float; 3]; 4] = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
 
 // Current data set
 const TRAIN: [[Float; 3]; 4] = OR;
@@ -34,7 +14,7 @@ const TRAIN: [[Float; 3]; 4] = OR;
 fn cost(w1: Float, w2: Float, b: Float) -> Float {
     let mut result = 0.0;
     for [x1, x2, outp] in TRAIN {
-        let y = sigmoidf(x1 * w1 + x2 * w2 + b);
+        let y = sigmoid(x1 * w1 + x2 * w2 + b);
         let d = y - outp;
         result += d * d;
     }
@@ -50,7 +30,7 @@ fn main() {
     let eps = 1e-1;
     let rate = 1e-1;
 
-	// Learning process
+    // Learning process
     for _ in 0..100_000 {
         let c = cost(w1, w2, b);
         println!(
@@ -66,8 +46,11 @@ fn main() {
         b -= rate * db;
     }
 
-	// Result
+    // Result
     for [inp1, inp2, _] in TRAIN {
-        println!("{inp1} | {inp2} = {r}", r = sigmoidf(inp1 * w1 + inp2 * w2 + b))
+        println!(
+            "{inp1} | {inp2} = {r}",
+            r = sigmoid(inp1 * w1 + inp2 * w2 + b)
+        )
     }
 }

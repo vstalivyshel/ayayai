@@ -1,4 +1,4 @@
-use wiggle_ai::*;
+use wiggle_ml::*;
 
 // Training data contains an input value and a expected output
 const TRAINING_DATA: [[isize; 2]; 4] = [[0, 0], [1, 2], [2, 4], [3, 8]];

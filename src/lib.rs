@@ -6,17 +6,18 @@ use std::{fmt, ops::Range};
 
 pub type Float = f32;
 
+#[macro_export]
 macro_rules! mat_at {
-    ($mat:ident, $raw:ident, $col:ident $($act:tt $v:expr)?) => {
+    ($mat:ident, $raw:tt, $col:tt $($act:tt $v:expr)?) => {
         $mat.elems[$raw * $mat.cols + $col] $($act $v)?
     };
 }
 
-pub fn sigmoidf(x: Float) -> Float {
+pub fn sigmoid(x: Float) -> Float {
     1.0 / (1.0 + (-x).exp())
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Mat {
     pub rows: usize,
     pub cols: usize,
@@ -60,7 +61,7 @@ impl Mat {
             .for_each(|i| *i = between.sample(&mut rng));
     }
 
-    pub fn dot_of(a: &Self, b: &Self) -> Self {
+    pub fn from_dot_of(a: &Self, b: &Self) -> Self {
         let mut new = Self::new(a.rows, b.cols);
         new.into_dot_of(a, b);
         new
@@ -91,23 +92,32 @@ impl Mat {
             .map(|(a, b)| *a + b)
             .collect();
     }
+
+    pub fn sigmoid(&mut self) {
+        self.elems.iter_mut().for_each(|e| *e = sigmoid(*e))
+    }
+
+    pub fn set_at(&mut self, r: usize, c: usize, v: Float) {
+        mat_at!(self, r, c = v);
+    }
+
+    pub fn get_at(&self, r: usize, c: usize) -> Float {
+        mat_at!(self, r, c)
+    }
 }
 
 impl fmt::Display for Mat {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut s = String::new();
+        let r = self.rows;
 
-        for i in 0..self.rows {
-            for j in 0..self.cols {
-                s.push_str(&format!(
-                    "{item:.n$} ",
-                    item = mat_at!(self, i, j),
-                    n = self.mantissa_fmt
-                ))
-            }
+        for row in self.elems.chunks(r) {
+            s.push_str("    ");
+            row.iter()
+                .for_each(|e| s.push_str(&format!("{e:.l$}  ", l = self.mantissa_fmt)));
             s.push('\n');
         }
 
-        write!(f, "{s}", s = s.trim_end())
+        write!(f, "[\n{s}]",)
     }
 }
