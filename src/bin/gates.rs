@@ -2,14 +2,14 @@ use wiggle_ml::*;
 
 const OR: [[Float; 3]; 4] = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 1.]];
 
-const _AND: [[Float; 3]; 4] = [[0., 0., 0.], [0., 1., 0.], [1., 0., 0.], [1., 1., 1.]];
+const AND: [[Float; 3]; 4] = [[0., 0., 0.], [0., 1., 0.], [1., 0., 0.], [1., 1., 1.]];
 
-const _NAND: [[Float; 3]; 4] = [[0., 0., 1.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
+const NAND: [[Float; 3]; 4] = [[0., 0., 1.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
 
-const _XOR: [[Float; 3]; 4] = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
+const XOR: [[Float; 3]; 4] = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
 
 // Current data set
-const TRAIN: [[Float; 3]; 4] = OR;
+const TRAIN: [[Float; 3]; 4] = AND;
 
 fn cost(w1: Float, w2: Float, b: Float) -> Float {
     let mut result = 0.0;
@@ -31,7 +31,7 @@ fn main() {
     let rate = 1e-1;
 
     // Learning process
-    for _ in 0..100_000 {
+    for _ in 0..100 {
         let c = cost(w1, w2, b);
         println!(
             "w1: {w1:<align$.flen$} w2: {w2:<align$.flen$} c: {c:.flen$}",
@@ -41,6 +41,7 @@ fn main() {
         let dw1 = (cost(w1 + eps, w2, b) - c) / eps;
         let dw2 = (cost(w1, w2 + eps, b) - c) / eps;
         let db = (cost(w1, w2, b + eps) - c) / eps;
+        println!("{dw1}, {dw2}, {db}");
         w1 -= rate * dw1;
         w2 -= rate * dw2;
         b -= rate * db;

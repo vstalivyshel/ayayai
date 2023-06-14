@@ -1,12 +1,15 @@
 use wiggle_ml::*;
 
 fn main() {
-    let a = Mat::new_randrang(1, 2, 5.0..10.0);
-    let b = Mat::new_fill(2, 2, 1.);
+    let mut a = Mat::new_randrang(2, 2, 5.0..10.0);
+    let b = Mat::new_fill(2, 2, 1.0);
     let dot = Mat::from_dot_of(&a, &b);
-    println!("{a}");
+    println!("a = {a}");
     println!("-------------------------------");
-    println!("{b}");
+    println!("b = {b}");
     println!("-------------------------------");
-    println!("{dot}");
+    println!("a * b = {dot}");
+    println!("-------------------------------");
+    a.sum(&b);
+    println!("a + b = {a}");
 }
