@@ -28,7 +28,7 @@ impl Mat {
         Self {
             rows,
             cols,
-            elems: vec![Float::default(); cols * rows],
+            elems: vec![Float::default(); colst * rows],
             fmt_mantissa: 7,
             fmt_padding: 0,
             fmt_name: None,
@@ -100,8 +100,6 @@ impl Mat {
     }
 
     pub fn sum(mut self, other: &Self) -> Self {
-        assert!(self.rows == other.rows);
-        assert!(self.cols == other.cols);
         self.elems = self
             .elems
             .iter_mut()
@@ -118,7 +116,6 @@ impl Mat {
     }
 
     pub fn get_dot(&self, other: &Self) -> Self {
-        assert!(self.cols == other.rows);
         let mut new = Self::new(self.rows, other.cols);
         for i in 0..new.rows {
             for j in 0..new.cols {
@@ -145,7 +142,6 @@ impl Mat {
     }
 
     pub fn apply_fill_from(&mut self, other: &Self) {
-        assert!(other.elems.len() == self.elems.len());
         self.elems.copy_from_slice(other.elems.as_slice());
     }
 
@@ -175,8 +171,6 @@ pub struct NN {
 impl NN {
     pub fn new(arch: &[usize]) -> Self {
         let arch_count = arch.len();
-        assert!(arch_count > 0);
-
         let count = arch_count - 1;
         let mut w = Vec::with_capacity(count);
         let mut b = Vec::with_capacity(count);
@@ -194,7 +188,13 @@ impl NN {
         }
         a[count].fmt_name = Some(format!("a{count}: output"));
 
-        Self { count, w, b, a, fmt_inputs: false }
+        Self {
+            count,
+            w,
+            b,
+            a,
+            fmt_inputs: false,
+        }
     }
 
     pub fn fmt_inputs(mut self, enable: bool) -> Self {
@@ -202,46 +202,38 @@ impl NN {
         self
     }
 
-    pub fn apply_forward(&mut self) {
+    pub fn forward(&mut self) {
         for i in 0..self.count {
             let out = self.a[i].get_dot(&self.w[i]).sum(&self.b[i]).all(sigmoid);
             self.a[i + 1].apply_fill_from(&out);
         }
     }
 
-    pub fn forward(mut self) -> Self {
-        self.apply_forward();
-        self
+    pub fn get_mut_input(&mut self) -> &mut Mat {
+        &mut self.a[0]
     }
 
-    pub fn supply_input(&mut self, inp: &Mat) {
-        self.a[0].apply_fill_from(inp);
+    pub fn set_input(&mut self, inp: &Mat) {
+        self.get_mut_input().apply_fill_from(inp);
     }
 
-    pub fn input(mut self, inp: &Mat) -> Self {
-        self.supply_input(inp);
-        self
-    }
-
-    pub fn get_output(&self) -> Mat {
-        self.getref_output().clone().fmt_name("output")
-    }
-
-    pub fn getref_output(&self) -> &Mat {
+    pub fn get_ref_output(&self) -> &Mat {
         &self.a[self.count]
     }
 
-    pub fn compute_cost(&mut self, ti: &Mat, to: &Mat) -> Float {
-        assert!(ti.rows == to.rows);
-        assert!(to.cols == self.getref_output().cols);
+    pub fn get_output(&self) -> Mat {
+        self.get_ref_output().clone().fmt_name("output")
+    }
+
+    pub fn cost(&mut self, ti: &Mat, to: &Mat) -> Float {
         let mut c = 0.;
         for i in 0..ti.rows {
             let x = ti.get_row(i);
             let y = to.get_row(i);
-            self.supply_input(&x);
-            self.apply_forward();
+            self.set_input(&x);
+            self.forward();
             for j in 0..to.cols {
-                let d = self.getref_output().get_at(0, j) - y.get_at(0, j);
+                let d = self.get_ref_output().get_at(0, j) - y.get_at(0, j);
                 c += d * d;
             }
         }
@@ -249,13 +241,47 @@ impl NN {
         c / ti.rows as Float
     }
 
-    // pub fn get_finite_diff(&mut self, eps: Float, ti: &Mat, to: &Mat) -> Self {
-    //     let mut saved: Float;
-    //     let c = self.compute_cost();
-    //     let mut g = self.clone();
-    //     for i in 0..self.count {
-    //     }
-    // }
+    pub fn finite_diff(&mut self, eps: Float, ti: &Mat, to: &Mat) -> Self {
+        let c = self.cost(ti, to);
+        let mut g = self.clone();
+        for i in 0..self.count {
+            for j in 0..self.w[i].rows {
+                for k in 0..self.w[i].cols {
+                    let saved = self.w[i].get_at(j, k);
+                    self.w[i].set_at(j, k, saved + eps);
+                    g.w[i].set_at(j, k, (self.cost(ti, to) - c) / eps);
+                    self.w[i].set_at(j, k, saved);
+                }
+            }
+
+            for j in 0..self.b[i].rows {
+                for k in 0..self.b[i].cols {
+                    let saved = self.b[i].get_at(j, k);
+                    self.b[i].set_at(j, k, saved + eps);
+                    g.b[i].set_at(j, k, (self.cost(ti, to) - c) / eps);
+                    self.b[i].set_at(j, k, saved);
+                }
+            }
+        }
+
+        g
+    }
+
+    pub fn apply_diff(&mut self, g: Self, rate: Float) {
+        self.w.iter_mut().zip(g.w.iter()).for_each(|(m, gm)| {
+            m.elems
+                .iter_mut()
+                .zip(gm.elems.iter())
+                .for_each(|(e, ge)| *e -= ge * rate)
+        });
+
+        self.b.iter_mut().zip(g.b.iter()).for_each(|(m, gm)| {
+            m.elems
+                .iter_mut()
+                .zip(gm.elems.iter())
+                .for_each(|(e, ge)| *e -= ge * rate)
+        });
+    }
 
     pub fn randomize_range(mut self, range: Range<Float>) -> Self {
         let mut rng = rand::thread_rng();
@@ -315,7 +341,6 @@ impl Display for NN {
                 s.push_str(&format!("{w}\n{b}\n"));
             }
         }
-
 
         write!(f, "[\n{s}]")
     }
