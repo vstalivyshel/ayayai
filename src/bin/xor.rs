@@ -35,7 +35,6 @@ const XOR: [[Float; 3]; 4] = [
 // Current data set
 const TRAIN: [[Float; 3]; 4] = NAND;
 
-
 #[derive(Clone, Debug)]
 struct N {
     w1: Float,
@@ -50,14 +49,12 @@ impl N {
             w2: rand::random::<Float>(),
             b: rand::random::<Float>(),
         }
-
     }
 
     fn forward(&self, x1: Float, x2: Float) -> Float {
         sigmoid(self.w1 * x1 + self.w2 * x2 + self.b)
     }
 }
-
 
 #[derive(Clone, Debug)]
 struct Xor {
@@ -73,7 +70,6 @@ impl Xor {
             nand: N::new(),
             and: N::new(),
         }
-
     }
     // takes an input and feeds it to the model returning output of each neuron
     // the idea is to feed the output of 'nand' and 'or' neurons to the last 'and' neuron
@@ -111,48 +107,48 @@ impl Xor {
         let c = self.cost();
         let mut saved: Float;
 
-		saved = self.or.w1;
-		self.or.w1 += eps;
+        saved = self.or.w1;
+        self.or.w1 += eps;
         g.or.w1 = (self.cost() - c) / eps;
         self.or.w1 = saved;
 
-		saved = self.or.w2;
-		self.or.w2 += eps;
+        saved = self.or.w2;
+        self.or.w2 += eps;
         g.or.w2 = (self.cost() - c) / eps;
         self.or.w2 = saved;
 
-		saved = self.or.b;
-		self.or.b += eps;
+        saved = self.or.b;
+        self.or.b += eps;
         g.or.b = (self.cost() - c) / eps;
         self.or.b = saved;
 
-		saved = self.nand.w1;
-		self.nand.w1 += eps;
+        saved = self.nand.w1;
+        self.nand.w1 += eps;
         g.nand.w1 = (self.cost() - c) / eps;
         self.nand.w1 = saved;
 
-		saved = self.nand.w2;
-		self.nand.w2 += eps;
+        saved = self.nand.w2;
+        self.nand.w2 += eps;
         g.nand.w2 = (self.cost() - c) / eps;
         self.nand.w2 = saved;
 
-		saved = self.nand.b;
-		self.nand.b += eps;
+        saved = self.nand.b;
+        self.nand.b += eps;
         g.nand.b = (self.cost() - c) / eps;
         self.nand.b = saved;
 
-		saved = self.and.w1;
-		self.and.w1 += eps;
+        saved = self.and.w1;
+        self.and.w1 += eps;
         g.and.w1 = (self.cost() - c) / eps;
         self.and.w1 = saved;
 
-		saved = self.and.w2;
-		self.and.w2 += eps;
+        saved = self.and.w2;
+        self.and.w2 += eps;
         g.and.w2 = (self.cost() - c) / eps;
         self.and.w2 = saved;
 
-		saved = self.and.b;
-		self.and.b += eps;
+        saved = self.and.b;
+        self.and.b += eps;
         g.and.b = (self.cost() - c) / eps;
         self.and.b = saved;
 
@@ -173,7 +169,6 @@ impl Xor {
         self.and.b -= g.and.b * rate;
     }
 }
-
 
 fn main() {
     let mut m = Xor::new();
