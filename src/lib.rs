@@ -10,12 +10,20 @@ pub fn sigmoid(x: Float) -> Float {
     1.0 / (1.0 + (-x).exp())
 }
 
+#[macro_export]
+macro_rules! mat_print {
+    ($($mat:ident),*) => {
+        $(println!("{name} = {m}", name = stringify!($mat), m = $mat)); *
+    };
+    ($($a:ident.$b:ident),*) => {{
+        $(let m = &$a.$b; mat_print!(m); )*
+    }}
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Mat {
     pub rows: usize,
     pub cols: usize,
-    pub stride: usize,
-    // TODO:
     pub elems: Vec<Float>,
     pub fmt_mantissa: usize,
 }
@@ -25,44 +33,49 @@ impl Mat {
         Self {
             rows,
             cols,
-            stride: cols,
-            elems: vec![Float::default(); rows * cols],
-            fmt_mantissa: 6,
+            elems: vec![Float::default(); cols * rows],
+            fmt_mantissa: 7,
         }
     }
 
-    pub fn new_fill(r: usize, c: usize, v: Float) -> Self {
-        let mut new = Self::new(r, c);
-        new.elems.fill(v);
-        new
+    pub fn fill(mut self, v: Float) -> Self {
+        self.elems.fill(v);
+        self
     }
 
-    pub fn new_rand(r: usize, c: usize) -> Self {
-        let mut new = Self::new(r, c);
-        new.fill_rand(0.0..1.1);
-        new
+    pub fn all<F: Fn(Float) -> Float>(mut self, f: F) -> Self {
+        self.apply_all(|v| f(v));
+        self
     }
 
-    pub fn new_randrang(r: usize, c: usize, range: Range<Float>) -> Self {
-        let mut new = Self::new(r, c);
-        new.fill_rand(range);
-        new
+    pub fn randomize_range(mut self, range: Range<Float>) -> Self {
+        let mut rng = rand::thread_rng();
+        let between = Uniform::from(range);
+        self.elems
+            .iter_mut()
+            .for_each(|i| *i = between.sample(&mut rng));
+
+        self
     }
 
-    pub fn fill_sub_from_slice(&mut self, src: &[Float], stride: usize) {
-        let src = src.iter();
+    pub fn randomize(self) -> Self {
+        self.randomize_range(0.0..1.0)
+    }
+
+    pub fn submat_from<S: AsRef<[Float]>>(mut self, src: S, stride: usize) -> Self {
+        let src = src.as_ref().iter();
         let mut j = 0;
+
         if self.cols == 1 {
             for e in src.step_by(stride) {
                 self.elems[j] = *e;
                 j += 1;
             }
 
-            return;
+            return self;
         }
 
-        let mut src = src.enumerate();
-        while let Some((i, e)) = src.next() {
+        for (i, e) in src.enumerate() {
             if (i + 1) % stride == 0 && j % self.cols == 0 {
                 continue;
             }
@@ -70,81 +83,65 @@ impl Mat {
             self.elems[j] = *e;
             j += 1;
         }
+
+        self
     }
 
-    pub fn fill_from(&mut self, src: &Mat) {
-        assert!(self.rows == src.rows, "On line {}", line!());
-        assert!(self.cols == src.cols, "On line {}", line!());
-        self.elems.copy_from_slice(src.elems.as_slice())
-    }
-
-    pub fn fill_from_slice(&mut self, src: &[Float]) {
-        for i in 0..self.elems.len() {
-            self.elems[i] = src[i]
-        }
-    }
-
-    pub fn fill_rand(&mut self, range: Range<Float>) {
-        let mut rng = rand::thread_rng();
-        let between = Uniform::from(range);
-        self.elems
-            .iter_mut()
-            .for_each(|i| *i = between.sample(&mut rng));
-    }
-
-    pub fn from_dot_of(a: &Self, b: &Self) -> Self {
-        let mut new = Self::new(a.rows, b.cols);
-        new.into_dot_of(a, b);
-        new
-    }
-
-    pub fn into_dot_of(&mut self, a: &Self, b: &Self) {
-        assert!(a.cols == b.rows, "On line {}", line!());
-        assert!(self.rows == a.rows, "On line {}", line!());
-        assert!(self.cols == b.cols, "On line {}", line!());
-        let n = a.cols;
-        for i in 0..self.rows {
-            for j in 0..self.cols {
-                self.set_at(i, j, 0.);
-                for k in 0..n {
-                    self.apply_at(i, j, |v| v + a.get_at(i, k) * b.get_at(k, j));
-                }
-            }
-        }
-    }
-
-    pub fn sum(&mut self, other: &Self) {
-        assert!(self.cols == other.cols, "On line {}", line!());
-        assert!(self.rows == other.rows, "On line {}", line!());
+    pub fn sum(mut self, other: &Self) -> Self {
+        assert!(self.rows == other.rows);
+        assert!(self.cols == other.cols);
         self.elems = self
             .elems
             .iter_mut()
-            .zip(&other.elems)
+            .zip(other.elems.iter())
             .map(|(a, b)| *a + b)
-            .collect();
+            .collect::<Vec<Float>>();
+
+        self
     }
 
-    pub fn apply_all<F: Fn(Float) -> Float>(&mut self, f: F) {
-        self.elems.iter_mut().for_each(|e| *e = f(*e))
+    pub fn get_sum(&self, other: &Self) -> Self {
+        let new = self.clone();
+        new.sum(other)
     }
 
-    pub fn set_at(&mut self, r: usize, c: usize, v: Float) {
-        self.elems[r * self.stride + c] = v;
+    pub fn get_dot(&self, other: &Self) -> Self {
+        assert!(self.cols == other.rows);
+        let mut new = Self::new(self.rows, other.cols);
+        for i in 0..new.rows {
+            for j in 0..new.cols {
+                new.set_at(i, j, 0.);
+                for k in 0..self.cols {
+                    new.apply_at(i, j, |v| v + self.get_at(i, k) * other.get_at(k, j));
+                }
+            }
+        }
+
+        new
+    }
+
+    pub fn get_row(&self, r: usize) -> Self {
+        let mut new = Self::new(1, self.cols);
+        let l = self.cols * r;
+        new.elems = self.elems[l..l + self.cols].into();
+
+        new
     }
 
     pub fn get_at(&self, r: usize, c: usize) -> Float {
-        self.elems[r * self.stride + c]
+        self.elems[r * self.cols + c]
+    }
+
+    pub fn set_at(&mut self, r: usize, c: usize, v: Float) {
+        self.elems[r * self.cols + c] = v;
     }
 
     pub fn apply_at<F: Fn(Float) -> Float>(&mut self, r: usize, c: usize, f: F) {
         self.set_at(r, c, f(self.get_at(r, c)))
     }
 
-    pub fn get_row(&self, r: usize) -> Mat {
-        let mut new = Mat::new(1, self.cols);
-        let l = self.cols * r;
-        new.elems = self.elems[l..l + self.cols].into();
-        new
+    pub fn apply_all<F: Fn(Float) -> Float>(&mut self, f: F) {
+        self.elems.iter_mut().for_each(|e| *e = f(*e))
     }
 }
 
@@ -153,8 +150,9 @@ impl fmt::Display for Mat {
         let mut s = String::new();
         for row in self.elems.chunks(self.cols) {
             s.push_str("    ");
-            row.iter()
-                .for_each(|e| s.push_str(&format!("{e:.l$}  ", l = self.fmt_mantissa)));
+            for e in row {
+                s.push_str(&format!("{e:.l$}  ", l = self.fmt_mantissa));
+            }
             s.push('\n');
         }
 
