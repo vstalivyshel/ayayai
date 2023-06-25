@@ -1,36 +1,5 @@
+use wiggle_ml::sample::arr_sample;
 use wiggle_ml::*;
-
-#[rustfmt::skip]
-const OR: [Float; 12] = [
-    0., 0., 0.,
-    0., 1., 1.,
-    1., 0., 1.,
-    1., 1., 1.
-];
-
-#[rustfmt::skip]
-const AND: [Float; 12] = [
-    0., 0., 0.,
-    0., 1., 0.,
-    1., 0., 0.,
-    1., 1., 1.
-];
-
-#[rustfmt::skip]
-const NAND: [Float; 12] = [
-    0., 0., 1.,
-    0., 1., 1.,
-    1., 0., 1.,
-    1., 1., 0.
-];
-
-#[rustfmt::skip]
-const XOR: [Float; 12] = [
-    0., 0., 0.,
-    0., 1., 1.,
-    1., 0., 1.,
-    1., 1., 0.
-];
 
 struct Xor {
     w1: Mat,
@@ -50,8 +19,8 @@ impl Xor {
     }
 
     fn forward(&self, x: &Mat) -> Float {
-        let a1 = x.get_dot(&self.w1).sum(&self.b1).all(|v| sigmoid(v));
-        let a2 = a1.get_dot(&self.w2).sum(&self.b2).all(|v| sigmoid(v));
+        let a1 = x.get_dot(&self.w1).sum(&self.b1).all(sigmoid);
+        let a2 = a1.get_dot(&self.w2).sum(&self.b2).all(sigmoid);
         a2.get_at(0, 0)
     }
 
@@ -144,7 +113,7 @@ impl Xor {
     }
 }
 
-const D: (char, [f32; 12]) = ('|', OR);
+const D: (&str, [f32; 12]) = arr_sample::OR;
 
 fn main() {
     let mut x = Mat::new(1, 2);

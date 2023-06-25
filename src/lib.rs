@@ -1,3 +1,4 @@
+pub mod sample;
 use rand::{
     self,
     distributions::{Distribution, Uniform},
@@ -7,7 +8,20 @@ use std::{
     ops::Range,
 };
 
+extern "C" {
+    fn rand() -> u32;
+    fn srand(seed: u32);
+}
+
 pub type Float = f32;
+
+pub fn set_seed(seed: u32) {
+    unsafe { srand(seed) }
+}
+
+pub fn gen_rand_fixed() -> Float {
+    unsafe { rand() as Float / u32::MAX as Float }
+}
 
 pub fn sigmoid(x: Float) -> Float {
     1.0 / (1.0 + (-x).exp())
@@ -28,7 +42,7 @@ impl Mat {
         Self {
             rows,
             cols,
-            elems: vec![Float::default(); colst * rows],
+            elems: vec![Float::default(); cols * rows],
             fmt_mantissa: 7,
             fmt_padding: 0,
             fmt_name: None,
@@ -72,6 +86,10 @@ impl Mat {
 
     pub fn randomize(self) -> Self {
         self.randomize_range(0.0..1.0)
+    }
+
+    pub fn apply_randomize_fixed(&mut self) {
+        self.elems.iter_mut().for_each(|i| *i = gen_rand_fixed());
     }
 
     pub fn submat_from<S: AsRef<[Float]>>(mut self, src: S, stride: usize) -> Self {
@@ -161,8 +179,8 @@ impl Mat {
 #[derive(Debug, Clone, Default)]
 pub struct NN {
     count: usize,
-    w: Vec<Mat>,
-    b: Vec<Mat>,
+    ws: Vec<Mat>,
+    bs: Vec<Mat>,
     a: Vec<Mat>,
 
     fmt_inputs: bool,
@@ -172,29 +190,43 @@ impl NN {
     pub fn new(arch: &[usize]) -> Self {
         let arch_count = arch.len();
         let count = arch_count - 1;
-        let mut w = Vec::with_capacity(count);
-        let mut b = Vec::with_capacity(count);
+        let mut ws = Vec::with_capacity(count);
+        let mut bs = Vec::with_capacity(count);
         let mut a = Vec::with_capacity(count + 1);
 
         a.push(Mat::new(1, arch[0]).fmt_name("a0: input").fmt_pad(4));
         for i in 1..arch_count {
-            w.push(
+            ws.push(
                 Mat::new(a[i - 1].cols, arch[i])
-                    .fmt_name(format!("w{i}"))
+                    .fmt_name(format!("ws{i}"))
                     .fmt_pad(4),
             );
-            b.push(Mat::new(1, arch[i]).fmt_name(format!("b{i}")).fmt_pad(4));
+            bs.push(Mat::new(1, arch[i]).fmt_name(format!("bs{i}")).fmt_pad(4));
             a.push(Mat::new(1, arch[i]).fmt_name(format!("a{i}")).fmt_pad(4));
         }
         a[count].fmt_name = Some(format!("a{count}: output"));
 
         Self {
             count,
-            w,
-            b,
+            ws,
+            bs,
             a,
             fmt_inputs: false,
         }
+    }
+
+    pub fn randomize_fixed(mut self) -> Self {
+        self.ws.iter_mut().for_each(|m| m.apply_randomize_fixed());
+        self.bs.iter_mut().for_each(|m| m.apply_randomize_fixed());
+        self.a.iter_mut().for_each(|m| m.apply_randomize_fixed());
+        self
+    }
+
+    pub fn fill(mut self, v: Float) -> Self {
+        self.ws.iter_mut().for_each(|m| m.apply_all(|_| v));
+        self.bs.iter_mut().for_each(|m| m.apply_all(|_| v));
+        self.a.iter_mut().for_each(|m| m.apply_all(|_| v));
+        self
     }
 
     pub fn fmt_inputs(mut self, enable: bool) -> Self {
@@ -204,7 +236,7 @@ impl NN {
 
     pub fn forward(&mut self) {
         for i in 0..self.count {
-            let out = self.a[i].get_dot(&self.w[i]).sum(&self.b[i]).all(sigmoid);
+            let out = self.a[i].get_dot(&self.ws[i]).sum(&self.bs[i]).all(sigmoid);
             self.a[i + 1].apply_fill_from(&out);
         }
     }
@@ -219,6 +251,10 @@ impl NN {
 
     pub fn get_ref_output(&self) -> &Mat {
         &self.a[self.count]
+    }
+
+    pub fn get_mut_output(&mut self) -> &mut Mat {
+        &mut self.a[self.count]
     }
 
     pub fn get_output(&self) -> Mat {
@@ -245,21 +281,21 @@ impl NN {
         let c = self.cost(ti, to);
         let mut g = self.clone();
         for i in 0..self.count {
-            for j in 0..self.w[i].rows {
-                for k in 0..self.w[i].cols {
-                    let saved = self.w[i].get_at(j, k);
-                    self.w[i].set_at(j, k, saved + eps);
-                    g.w[i].set_at(j, k, (self.cost(ti, to) - c) / eps);
-                    self.w[i].set_at(j, k, saved);
+            for j in 0..self.ws[i].rows {
+                for k in 0..self.ws[i].cols {
+                    let saved = self.ws[i].get_at(j, k);
+                    self.ws[i].set_at(j, k, saved + eps);
+                    g.ws[i].set_at(j, k, (self.cost(ti, to) - c) / eps);
+                    self.ws[i].set_at(j, k, saved);
                 }
             }
 
-            for j in 0..self.b[i].rows {
-                for k in 0..self.b[i].cols {
-                    let saved = self.b[i].get_at(j, k);
-                    self.b[i].set_at(j, k, saved + eps);
-                    g.b[i].set_at(j, k, (self.cost(ti, to) - c) / eps);
-                    self.b[i].set_at(j, k, saved);
+            for j in 0..self.bs[i].rows {
+                for k in 0..self.bs[i].cols {
+                    let saved = self.bs[i].get_at(j, k);
+                    self.bs[i].set_at(j, k, saved + eps);
+                    g.bs[i].set_at(j, k, (self.cost(ti, to) - c) / eps);
+                    self.bs[i].set_at(j, k, saved);
                 }
             }
         }
@@ -268,14 +304,14 @@ impl NN {
     }
 
     pub fn apply_diff(&mut self, g: Self, rate: Float) {
-        self.w.iter_mut().zip(g.w.iter()).for_each(|(m, gm)| {
+        self.ws.iter_mut().zip(g.ws.iter()).for_each(|(m, gm)| {
             m.elems
                 .iter_mut()
                 .zip(gm.elems.iter())
                 .for_each(|(e, ge)| *e -= ge * rate)
         });
 
-        self.b.iter_mut().zip(g.b.iter()).for_each(|(m, gm)| {
+        self.bs.iter_mut().zip(g.bs.iter()).for_each(|(m, gm)| {
             m.elems
                 .iter_mut()
                 .zip(gm.elems.iter())
@@ -283,12 +319,75 @@ impl NN {
         });
     }
 
+    pub fn backprop(&mut self, ti: &Mat, to: &Mat) -> Self {
+        assert!(ti.rows == to.rows);
+        assert!(self.get_ref_output().cols == to.cols);
+        let mut g = self.clone().fill(0.);
+        let n = ti.rows;
+
+        // i - current sample
+        // l - current layer
+        // j - current activation
+        // k - previous activation
+
+        for i in 0..n {
+            self.set_input(&ti.get_row(i));
+            self.forward();
+
+            for j in 0..=self.count {
+                g.a[j].apply_all(|_| 0.);
+            }
+
+            for j in 0..to.cols {
+                g.get_mut_output().set_at(
+                    0,
+                    j,
+                    self.get_ref_output().get_at(0, j) - to.get_at(i, j),
+                );
+            }
+
+            for l in (1..=self.count).rev() {
+                for j in 0..self.a[l].cols {
+                    let a = self.a[l].get_at(0, j);
+                    let da = g.a[l].get_at(0, j);
+                    g.bs[l - 1].apply_at(0, j, |v| v + (2. * da * a * (1. - a)));
+                    let x = 2. * da * a * (1. - a);
+                    for k in 0..self.a[l - 1].cols {
+                        // j - weight matrix col
+                        // k - weight matrix row
+                        let w = self.ws[l - 1].get_at(k, j);
+                        let pa = self.a[l - 1].get_at(0, k);
+                        g.ws[l - 1].apply_at(k, j, |v| v + (2. * da * a * (1. - a) * pa));
+                        g.a[l - 1].apply_at(0, k, |v| v + (2. * da * a * (1. - a) * w));
+                    }
+                }
+            }
+        }
+
+        for i in 0..g.count {
+            for j in 0..g.ws[i].rows {
+                for k in 0..g.ws[i].cols {
+                    g.ws[i].apply_at(j, k, |v| v / n as Float);
+                }
+            }
+
+            for j in 0..g.bs[i].rows {
+                for k in 0..g.bs[i].cols {
+                    g.bs[i].apply_at(j, k, |v| v / n as Float);
+                }
+            }
+        }
+
+
+        g
+    }
+
     pub fn randomize_range(mut self, range: Range<Float>) -> Self {
         let mut rng = rand::thread_rng();
         let between = Uniform::from(range);
-        self.w
+        self.ws
             .iter_mut()
-            .zip(self.b.iter_mut())
+            .zip(self.bs.iter_mut())
             .for_each(|(wm, bm)| {
                 wm.apply_all(|_| between.sample(&mut rng));
                 bm.apply_all(|_| between.sample(&mut rng));
@@ -333,11 +432,16 @@ impl Display for NN {
         if self.fmt_inputs {
             s.push_str(self.a[0].to_string().as_str());
             s.push('\n');
-            for ((w, b), a) in self.w.iter().zip(self.b.iter()).zip(self.a.iter().skip(1)) {
+            for ((w, b), a) in self
+                .ws
+                .iter()
+                .zip(self.bs.iter())
+                .zip(self.a.iter().skip(1))
+            {
                 s.push_str(&format!("{a}\n{w}\n{b}\n"));
             }
         } else {
-            for (w, b) in self.w.iter().zip(self.b.iter()) {
+            for (w, b) in self.ws.iter().zip(self.bs.iter()) {
                 s.push_str(&format!("{w}\n{b}\n"));
             }
         }

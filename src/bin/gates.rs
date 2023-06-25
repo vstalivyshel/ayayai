@@ -1,57 +1,111 @@
+use wiggle_ml::sample;
 use wiggle_ml::*;
-
-const OR: [[Float; 3]; 4] = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 1.]];
-
-const AND: [[Float; 3]; 4] = [[0., 0., 0.], [0., 1., 0.], [1., 0., 0.], [1., 1., 1.]];
-
-const NAND: [[Float; 3]; 4] = [[0., 0., 1.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
-
-const XOR: [[Float; 3]; 4] = [[0., 0., 0.], [0., 1., 1.], [1., 0., 1.], [1., 1., 0.]];
-
-// Current data set
-const TRAIN: [[Float; 3]; 4] = AND;
 
 fn cost(w1: Float, w2: Float, b: Float) -> Float {
     let mut result = 0.0;
-    for [x1, x2, outp] in TRAIN {
+    let train = TRAIN.1;
+    for [x1, x2, outp] in train {
         let y = sigmoid(x1 * w1 + x2 * w2 + b);
         let d = y - outp;
         result += d * d;
     }
 
-    result / TRAIN.len() as Float
+    result / train.len() as Float
 }
 
-fn main() {
-    // Setup the model's parameters
-    let mut w1 = rand::random::<Float>() * 10.0 - 5.0;
-    let mut w2 = rand::random::<Float>() * 10.0 - 5.0;
-    let mut b = rand::random::<Float>() * 10.0 - 5.0;
-    let eps = 1e-1;
-    let rate = 1e-1;
+// using gradient discent
+#[allow(dead_code)]
+fn g(mut w1: Float, mut w2: Float, mut b: Float, dbg: bool) {
+    //                                           dw1    dw2    db
+    fn gcost(w1: Float, w2: Float, b: Float) -> (Float, Float, Float) {
+        let mut dw1 = 0.;
+        let mut dw2 = 0.;
+        let mut db = 0.;
+        let train = TRAIN.1;
+        for [xi, yi, zi] in train {
+            let ai = sigmoid(xi * w1 + yi * w2 + b);
+            let db_i = 2. * (ai - zi) * ai * (1. - ai);
+            // D_X_i = 2(a_i - z_i) * a_i (1 - a_i) * x_i
+            dw1 += db_i * xi;
+            // D_Y_i = 2(a_i - z_i) * a_i (1 - a_i) * y_i
+            dw2 += db_i * yi;
+            // D_B_i = 2(a_i - z_i) * a_i (1 - a_i)
+            db += db_i;
+        }
+        let tl = train.len() as Float;
 
-    // Learning process
-    for _ in 0..100 {
-        let c = cost(w1, w2, b);
-        println!(
-            "w1: {w1:<align$.flen$} w2: {w2:<align$.flen$} c: {c:.flen$}",
-            align = 14,
-            flen = 7
-        );
-        let dw1 = (cost(w1 + eps, w2, b) - c) / eps;
-        let dw2 = (cost(w1, w2 + eps, b) - c) / eps;
-        let db = (cost(w1, w2, b + eps) - c) / eps;
-        println!("{dw1}, {dw2}, {db}");
-        w1 -= rate * dw1;
-        w2 -= rate * dw2;
-        b -= rate * db;
+        (dw1 / tl, dw2 / tl, db / tl)
     }
 
-    // Result
-    for [inp1, inp2, _] in TRAIN {
+    for i in 0..N {
+        let c = cost(w1, w2, b);
+        if dbg {
+            println!(
+                "({i}) w1: {w1:<align$.m$} w2: {w2:<align$.m$} c: {c:.m$}",
+                align = 14,
+                m = 7
+            );
+        }
+        let (dw1, dw2, db) = gcost(w1, w2, b);
+        w1 -= RATE * dw1;
+        w2 -= RATE * dw2;
+        b -= RATE * db;
+    }
+
+    println!("c: {c}", c = cost(w1, w2, b));
+    for [inp1, inp2, _] in TRAIN.1 {
         println!(
-            "{inp1} | {inp2} = {r}",
+            "{inp1} {s} {inp2} = {r}",
+            s = TRAIN.0,
             r = sigmoid(inp1 * w1 + inp2 * w2 + b)
         )
     }
+}
+
+// using finite difference
+#[allow(dead_code)]
+fn fd(mut w1: Float, mut w2: Float, mut b: Float, dbg: bool) {
+    let eps = 1e-1;
+
+    for i in 0..N {
+        let c = cost(w1, w2, b);
+        if dbg {
+            println!(
+                "({i}) w1: {w1:<align$.m$} w2: {w2:<align$.m$} c: {c:.m$}",
+                align = 14,
+                m = 7
+            );
+        }
+        let dw1 = (cost(w1 + eps, w2, b) - c) / eps;
+        let dw2 = (cost(w1, w2 + eps, b) - c) / eps;
+        let db = (cost(w1, w2, b + eps) - c) / eps;
+        w1 -= RATE * dw1;
+        w2 -= RATE * dw2;
+        b -= RATE * db;
+    }
+
+    println!("c: {c}", c = cost(w1, w2, b));
+    for [inp1, inp2, _] in TRAIN.1 {
+        println!(
+            "{inp1} {s} {inp2} = {r}",
+            s = TRAIN.0,
+            r = sigmoid(inp1 * w1 + inp2 * w2 + b)
+        )
+    }
+}
+
+const RATE: Float = 1e-1;
+const TRAIN: (&str, [[Float; 3]; 4]) = sample::AND;
+const N: usize = 100;
+
+fn main() {
+    let w1 = rand::random::<Float>();
+    let w2 = rand::random::<Float>();
+    let b = rand::random::<Float>();
+
+    println!("gd:");
+    g(w1, w2, b, false);
+    println!("-------------------------------");
+    println!("fd:");
+    fd(w1, w2, b, false);
 }

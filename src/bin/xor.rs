@@ -1,39 +1,8 @@
-use std::ops;
+use wiggle_ml::sample;
 use wiggle_ml::*;
-#[rustfmt::skip]
-const OR: [[Float; 3]; 4] = [
-    [0., 0., 0.],
-    [0., 1., 1.],
-    [1., 0., 1.],
-    [1., 1., 1.]
-];
-
-#[rustfmt::skip]
-const AND: [[Float; 3]; 4] = [
-    [0., 0., 0.],
-    [0., 1., 0.],
-    [1., 0., 0.],
-    [1., 1., 1.]
-];
-
-#[rustfmt::skip]
-const NAND: [[Float; 3]; 4] = [
-    [0., 0., 1.],
-    [0., 1., 1.],
-    [1., 0., 1.],
-    [1., 1., 0.]
-];
-
-#[rustfmt::skip]
-const XOR: [[Float; 3]; 4] = [
-    [0., 0., 0.],
-    [0., 1., 1.],
-    [1., 0., 1.],
-    [1., 1., 0.]
-];
 
 // Current data set
-const TRAIN: [[Float; 3]; 4] = NAND;
+const TRAIN: (&str, [[Float; 3]; 4]) = sample::NAND;
 
 #[derive(Clone, Debug)]
 struct N {
@@ -93,13 +62,14 @@ impl Xor {
 
     fn cost(&self) -> Float {
         let mut result = 0.0;
-        for [x1, x2, outp] in TRAIN {
+        let train = TRAIN.1;
+        for [x1, x2, outp] in train {
             let y = self.forward(x1, x2);
             let d = y - outp;
             result += d * d;
         }
 
-        result / TRAIN.len() as Float
+        result / train.len() as Float
     }
 
     fn finite_diff(&mut self, eps: Float) -> Self {
@@ -181,7 +151,7 @@ fn main() {
         println!("{c}", c = m.cost());
     }
 
-    for [x1, x2, _] in TRAIN {
-        println!("{x1} ^ {x2} = {r}", r = m.forward(x1, x2));
+    for [x1, x2, _] in TRAIN.1 {
+        println!("{x1} {s} {x2} = {r}", s = TRAIN.0, r = m.forward(x1, x2));
     }
 }
