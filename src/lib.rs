@@ -31,7 +31,8 @@ pub fn sigmoid(x: Float) -> Float {
 pub struct Mat {
     pub rows: usize,
     pub cols: usize,
-    pub elems: Vec<Float>,
+    pub es: Vec<Float>,
+
     pub fmt_mantissa: usize,
     pub fmt_padding: usize,
     pub fmt_name: Option<String>,
@@ -42,7 +43,7 @@ impl Mat {
         Self {
             rows,
             cols,
-            elems: vec![Float::default(); cols * rows],
+            es: vec![Float::default(); cols * rows],
             fmt_mantissa: 7,
             fmt_padding: 0,
             fmt_name: None,
@@ -70,7 +71,7 @@ impl Mat {
     }
 
     pub fn filled(mut self, v: Float) -> Self {
-        self.elems.fill(v);
+        self.es.fill(v);
         self
     }
 
@@ -99,19 +100,19 @@ impl Mat {
         self
     }
 
-    pub fn sumed_with(mut self, other: &Self) -> Self {
+    pub fn summed_with(mut self, other: &Self) -> Self {
         self.apply_sum(other);
         self
     }
 
     pub fn fill(&mut self, v: Float) {
-        self.elems.fill(v);
+        self.es.fill(v);
     }
 
     pub fn randomize_range(&mut self, range: Range<Float>) {
         let mut rng = rand::thread_rng();
         let between = Uniform::from(range);
-        self.elems
+        self.es
             .iter_mut()
             .for_each(|i| *i = between.sample(&mut rng));
     }
@@ -121,7 +122,7 @@ impl Mat {
     }
 
     pub fn randomize_fixed(&mut self) {
-        self.elems.iter_mut().for_each(|i| *i = gen_rand_fixed());
+        self.es.iter_mut().for_each(|i| *i = gen_rand_fixed());
     }
 
     pub fn fill_from_submat<S: AsRef<[Float]>>(&mut self, src: S, stride: usize) {
@@ -129,7 +130,7 @@ impl Mat {
         let mut j = 0;
         if self.cols == 1 {
             for e in src.step_by(stride) {
-                self.elems[j] = *e;
+                self.es[j] = *e;
                 j += 1;
             }
         } else {
@@ -138,22 +139,22 @@ impl Mat {
                     continue;
                 }
 
-                self.elems[j] = *e;
+                self.es[j] = *e;
                 j += 1;
             }
         }
     }
 
     pub fn fill_from(&mut self, other: &Self) {
-        self.elems.copy_from_slice(other.elems.as_slice());
+        self.es.copy_from_slice(other.es.as_slice());
     }
 
     pub fn get_at(&self, r: usize, c: usize) -> Float {
-        self.elems[r * self.cols + c]
+        self.es[r * self.cols + c]
     }
 
     pub fn get_mut_at(&mut self, r: usize, c: usize) -> &mut Float {
-        &mut self.elems[r * self.cols + c]
+        &mut self.es[r * self.cols + c]
     }
 
     pub fn apply_at<F: FnMut(Float) -> Float>(&mut self, r: usize, c: usize, mut f: F) {
@@ -161,22 +162,22 @@ impl Mat {
     }
 
     pub fn apply_all<F: FnMut(Float) -> Float>(&mut self, mut f: F) {
-        self.elems.iter_mut().for_each(|e| *e = f(*e))
+        self.es.iter_mut().for_each(|e| *e = f(*e))
     }
 
     pub fn set_at(&mut self, r: usize, c: usize, v: Float) {
-        self.elems[r * self.cols + c] = v;
+        self.es[r * self.cols + c] = v;
     }
 
     pub fn apply_sum(&mut self, other: &Self) {
-        self.elems
+        self.es
             .iter_mut()
             .enumerate()
-            .for_each(|(i, a)| *a += other.elems[i]);
+            .for_each(|(i, a)| *a += other.es[i]);
     }
 
     pub fn sum(&self, other: &Self) -> Self {
-        self.clone().sumed_with(other)
+        self.clone().summed_with(other)
     }
 
     pub fn dot(&self, other: &Self) -> Self {
@@ -196,7 +197,7 @@ impl Mat {
     pub fn row(&self, r: usize) -> Self {
         let mut new = Self::new(1, self.cols);
         let l = self.cols * r;
-        new.elems = self.elems[l..l + self.cols].into();
+        new.es = self.es[l..l + self.cols].into();
 
         new
     }
@@ -296,6 +297,7 @@ impl NN {
         self.ws.iter_mut().for_each(|m| m.apply_all(|_| v));
         self.bs.iter_mut().for_each(|m| m.apply_all(|_| v));
     }
+
     pub fn set_input(&mut self, inp: &Mat) {
         self.get_mut_input().fill_from(inp);
     }
@@ -431,16 +433,16 @@ impl NN {
 
     pub fn learn(&mut self, g: &Self, rate: Float) {
         self.ws.iter_mut().zip(g.ws.iter()).for_each(|(m, gm)| {
-            m.elems
+            m.es
                 .iter_mut()
-                .zip(gm.elems.iter())
+                .zip(gm.es.iter())
                 .for_each(|(e, ge)| *e -= ge * rate)
         });
 
         self.bs.iter_mut().zip(g.bs.iter()).for_each(|(m, gm)| {
-            m.elems
+            m.es
                 .iter_mut()
-                .zip(gm.elems.iter())
+                .zip(gm.es.iter())
                 .for_each(|(e, ge)| *e -= ge * rate)
         });
     }
@@ -450,7 +452,7 @@ impl Display for Mat {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let mut s = String::new();
         let pad = (0..self.fmt_padding).map(|_| ' ').collect::<String>();
-        for row in self.elems.chunks(self.cols) {
+        for row in self.es.chunks(self.cols) {
             s.push_str(&format!("    {pad}"));
             for e in row {
                 s.push_str(&format!("{e:.l$}  ", l = self.fmt_mantissa));
