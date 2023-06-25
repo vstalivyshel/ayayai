@@ -15,7 +15,7 @@ fn cost(w1: Float, w2: Float, b: Float) -> Float {
 
 // using gradient discent
 #[allow(dead_code)]
-fn g(mut w1: Float, mut w2: Float, mut b: Float, dbg: bool) {
+fn g(mut w1: Float, mut w2: Float, mut b: Float) {
     //                                           dw1    dw2    db
     fn gcost(w1: Float, w2: Float, b: Float) -> (Float, Float, Float) {
         let mut dw1 = 0.;
@@ -39,7 +39,7 @@ fn g(mut w1: Float, mut w2: Float, mut b: Float, dbg: bool) {
 
     for i in 0..N {
         let c = cost(w1, w2, b);
-        if dbg {
+        if DBG {
             println!(
                 "({i}) w1: {w1:<align$.m$} w2: {w2:<align$.m$} c: {c:.m$}",
                 align = 14,
@@ -64,12 +64,12 @@ fn g(mut w1: Float, mut w2: Float, mut b: Float, dbg: bool) {
 
 // using finite difference
 #[allow(dead_code)]
-fn fd(mut w1: Float, mut w2: Float, mut b: Float, dbg: bool) {
+fn fd(mut w1: Float, mut w2: Float, mut b: Float) {
     let eps = 1e-1;
 
     for i in 0..N {
         let c = cost(w1, w2, b);
-        if dbg {
+        if DBG {
             println!(
                 "({i}) w1: {w1:<align$.m$} w2: {w2:<align$.m$} c: {c:.m$}",
                 align = 14,
@@ -97,6 +97,7 @@ fn fd(mut w1: Float, mut w2: Float, mut b: Float, dbg: bool) {
 const RATE: Float = 1e-1;
 const TRAIN: (&str, [[Float; 3]; 4]) = sample::AND;
 const N: usize = 100;
+const DBG: bool = false;
 
 fn main() {
     let w1 = rand::random::<Float>();
@@ -104,8 +105,8 @@ fn main() {
     let b = rand::random::<Float>();
 
     println!("gd:");
-    g(w1, w2, b, false);
+    g(w1, w2, b);
     println!("-------------------------------");
     println!("fd:");
-    fd(w1, w2, b, false);
+    fd(w1, w2, b);
 }

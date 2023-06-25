@@ -1,6 +1,7 @@
 use wiggle_ml::sample::arr_sample;
 use wiggle_ml::*;
 
+#[derive(Clone)]
 struct Xor {
     w1: Mat,
     b1: Mat,
@@ -36,8 +37,7 @@ impl Xor {
         result / ti.rows as Float
     }
 
-    fn finite_diff(&mut self, eps: Float, ti: &Mat, to: &Mat) -> Self {
-        let mut g = Self::new();
+    fn finite_diff(&mut self, g: &mut Self, ti: &Mat, to: &Mat, eps: Float) {
         let c = self.cost(ti, to);
         let mut saved: Float;
 
@@ -76,8 +76,6 @@ impl Xor {
                 self.b2.set_at(i, j, saved);
             }
         }
-
-        g
     }
 
     fn learn(&mut self, g: &Self, rate: Float) {
@@ -124,11 +122,12 @@ fn main() {
     let to = Mat::new(4, 1).submat_from(&D.1[2..], 3);
 
     let mut m = Xor::new();
+    let mut g = m.clone();
     let eps = 1e-1;
     let rate = 1e-1;
 
     for _ in 0..20000 {
-        let g = m.finite_diff(eps, &ti, &to);
+        m.finite_diff(&mut g, &ti, &to, eps);
         m.learn(&g, rate);
         println!("{c}", c = m.cost(&ti, &to));
     }

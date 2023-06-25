@@ -222,11 +222,10 @@ impl NN {
         self
     }
 
-    pub fn fill(mut self, v: Float) -> Self {
+    pub fn apply_fill(&mut self, v: Float) {
         self.ws.iter_mut().for_each(|m| m.apply_all(|_| v));
         self.bs.iter_mut().for_each(|m| m.apply_all(|_| v));
         self.a.iter_mut().for_each(|m| m.apply_all(|_| v));
-        self
     }
 
     pub fn fmt_inputs(mut self, enable: bool) -> Self {
@@ -277,9 +276,8 @@ impl NN {
         c / ti.rows as Float
     }
 
-    pub fn finite_diff(&mut self, eps: Float, ti: &Mat, to: &Mat) -> Self {
+    pub fn finite_diff(&mut self, g: &mut Self, ti: &Mat, to: &Mat, eps: Float, ) {
         let c = self.cost(ti, to);
-        let mut g = self.clone();
         for i in 0..self.count {
             for j in 0..self.ws[i].rows {
                 for k in 0..self.ws[i].cols {
@@ -299,11 +297,9 @@ impl NN {
                 }
             }
         }
-
-        g
     }
 
-    pub fn apply_diff(&mut self, g: Self, rate: Float) {
+    pub fn learn(&mut self, g: &Self, rate: Float) {
         self.ws.iter_mut().zip(g.ws.iter()).for_each(|(m, gm)| {
             m.elems
                 .iter_mut()
@@ -319,10 +315,10 @@ impl NN {
         });
     }
 
-    pub fn backprop(&mut self, ti: &Mat, to: &Mat) -> Self {
+    pub fn backprop(&mut self, g: &mut Self, ti: &Mat, to: &Mat) {
         assert!(ti.rows == to.rows);
         assert!(self.get_ref_output().cols == to.cols);
-        let mut g = self.clone().fill(0.);
+        g.apply_fill(0.);
         let n = ti.rows;
 
         // i - current sample
@@ -351,7 +347,6 @@ impl NN {
                     let a = self.a[l].get_at(0, j);
                     let da = g.a[l].get_at(0, j);
                     g.bs[l - 1].apply_at(0, j, |v| v + (2. * da * a * (1. - a)));
-                    let x = 2. * da * a * (1. - a);
                     for k in 0..self.a[l - 1].cols {
                         // j - weight matrix col
                         // k - weight matrix row
@@ -377,9 +372,6 @@ impl NN {
                 }
             }
         }
-
-
-        g
     }
 
     pub fn randomize_range(mut self, range: Range<Float>) -> Self {
