@@ -12,16 +12,16 @@ struct Xor {
 impl Xor {
     fn new() -> Self {
         Self {
-            w1: Mat::new(2, 2).randomize(),
-            b1: Mat::new(1, 2).randomize(),
-            w2: Mat::new(2, 1).randomize(),
-            b2: Mat::new(1, 1).randomize(),
+            w1: Mat::new(2, 2).randomized(),
+            b1: Mat::new(1, 2).randomized(),
+            w2: Mat::new(2, 1).randomized(),
+            b2: Mat::new(1, 1).randomized(),
         }
     }
 
     fn forward(&self, x: &Mat) -> Float {
-        let a1 = x.get_dot(&self.w1).sum(&self.b1).all(sigmoid);
-        let a2 = a1.get_dot(&self.w2).sum(&self.b2).all(sigmoid);
+        let a1 = x.dot(&self.w1).sum(&self.b1).with_all(sigmoid);
+        let a2 = a1.dot(&self.w2).sum(&self.b2).with_all(sigmoid);
         a2.get_at(0, 0)
     }
 
@@ -29,7 +29,7 @@ impl Xor {
         let mut result = 0.;
         for i in 0..ti.rows {
             let o = to.get_at(i, 0);
-            let y = self.forward(&ti.get_row(i));
+            let y = self.forward(&ti.row(i));
             let d = y - o;
             result += d * d;
         }

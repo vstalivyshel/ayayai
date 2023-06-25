@@ -64,76 +64,122 @@ impl Mat {
         self
     }
 
-    pub fn fill(mut self, v: Float) -> Self {
+    pub fn submat_from<S: AsRef<[Float]>>(mut self, src: S, stride: usize) -> Self {
+        self.fill_from_submat(src, stride);
+        self
+    }
+
+    pub fn filled(mut self, v: Float) -> Self {
         self.elems.fill(v);
         self
     }
 
-    pub fn all<F: FnMut(Float) -> Float>(mut self, f: F) -> Self {
+    pub fn filled_from(mut self, other: &Self) -> Self {
+        self.fill_from(other);
+        self
+    }
+
+    pub fn with_all<F: FnMut(Float) -> Float>(mut self, f: F) -> Self {
         self.apply_all(f);
         self
     }
 
-    pub fn randomize_range(mut self, range: Range<Float>) -> Self {
+    pub fn randomized_range(mut self, range: Range<Float>) -> Self {
+        self.randomize_range(range);
+        self
+    }
+
+    pub fn randomized(mut self) -> Self {
+        self.randomize_range(0.0..1.0);
+        self
+    }
+
+    pub fn randomized_fixed(mut self) -> Self {
+        self.randomize_fixed();
+        self
+    }
+
+    pub fn sumed_with(mut self, other: &Self) -> Self {
+        self.apply_sum(other);
+        self
+    }
+
+    pub fn fill(&mut self, v: Float) {
+        self.elems.fill(v);
+    }
+
+    pub fn randomize_range(&mut self, range: Range<Float>) {
         let mut rng = rand::thread_rng();
         let between = Uniform::from(range);
         self.elems
             .iter_mut()
             .for_each(|i| *i = between.sample(&mut rng));
-
-        self
     }
 
-    pub fn randomize(self) -> Self {
-        self.randomize_range(0.0..1.0)
+    pub fn randomize(&mut self) {
+        self.randomize_range(0.0..1.0);
     }
 
-    pub fn apply_randomize_fixed(&mut self) {
+    pub fn randomize_fixed(&mut self) {
         self.elems.iter_mut().for_each(|i| *i = gen_rand_fixed());
     }
 
-    pub fn submat_from<S: AsRef<[Float]>>(mut self, src: S, stride: usize) -> Self {
+    pub fn fill_from_submat<S: AsRef<[Float]>>(&mut self, src: S, stride: usize) {
         let src = src.as_ref().iter();
         let mut j = 0;
-
         if self.cols == 1 {
             for e in src.step_by(stride) {
                 self.elems[j] = *e;
                 j += 1;
             }
+        } else {
+            for (i, e) in src.enumerate() {
+                if (i + 1) % stride == 0 && j % self.cols == 0 {
+                    continue;
+                }
 
-            return self;
-        }
-
-        for (i, e) in src.enumerate() {
-            if (i + 1) % stride == 0 && j % self.cols == 0 {
-                continue;
+                self.elems[j] = *e;
+                j += 1;
             }
-
-            self.elems[j] = *e;
-            j += 1;
         }
-
-        self
     }
 
-    pub fn sum(mut self, other: &Self) -> Self {
-        self.elems = self
-            .elems
+    pub fn fill_from(&mut self, other: &Self) {
+        self.elems.copy_from_slice(other.elems.as_slice());
+    }
+
+    pub fn get_at(&self, r: usize, c: usize) -> Float {
+        self.elems[r * self.cols + c]
+    }
+
+    pub fn get_mut_at(&mut self, r: usize, c: usize) -> &mut Float {
+        &mut self.elems[r * self.cols + c]
+    }
+
+    pub fn apply_at<F: FnMut(Float) -> Float>(&mut self, r: usize, c: usize, mut f: F) {
+        self.set_at(r, c, f(self.get_at(r, c)))
+    }
+
+    pub fn apply_all<F: FnMut(Float) -> Float>(&mut self, mut f: F) {
+        self.elems.iter_mut().for_each(|e| *e = f(*e))
+    }
+
+    pub fn set_at(&mut self, r: usize, c: usize, v: Float) {
+        self.elems[r * self.cols + c] = v;
+    }
+
+    pub fn apply_sum(&mut self, other: &Self) {
+        self.elems
             .iter_mut()
-            .zip(other.elems.iter())
-            .map(|(a, b)| *a + b)
-            .collect::<Vec<Float>>();
-
-        self
+            .enumerate()
+            .for_each(|(i, a)| *a += other.elems[i]);
     }
 
-    pub fn get_sum(&self, other: &Self) -> Self {
-        let new = self.clone();
-        new.sum(other)
+    pub fn sum(&self, other: &Self) -> Self {
+        self.clone().sumed_with(other)
     }
 
-    pub fn get_dot(&self, other: &Self) -> Self {
+    pub fn dot(&self, other: &Self) -> Self {
         let mut new = Self::new(self.rows, other.cols);
         for i in 0..new.rows {
             for j in 0..new.cols {
@@ -147,32 +193,12 @@ impl Mat {
         new
     }
 
-    pub fn get_row(&self, r: usize) -> Self {
+    pub fn row(&self, r: usize) -> Self {
         let mut new = Self::new(1, self.cols);
         let l = self.cols * r;
         new.elems = self.elems[l..l + self.cols].into();
 
         new
-    }
-
-    pub fn get_at(&self, r: usize, c: usize) -> Float {
-        self.elems[r * self.cols + c]
-    }
-
-    pub fn apply_fill_from(&mut self, other: &Self) {
-        self.elems.copy_from_slice(other.elems.as_slice());
-    }
-
-    pub fn apply_at<F: FnMut(Float) -> Float>(&mut self, r: usize, c: usize, mut f: F) {
-        self.set_at(r, c, f(self.get_at(r, c)))
-    }
-
-    pub fn apply_all<F: FnMut(Float) -> Float>(&mut self, mut f: F) {
-        self.elems.iter_mut().for_each(|e| *e = f(*e))
-    }
-
-    pub fn set_at(&mut self, r: usize, c: usize, v: Float) {
-        self.elems[r * self.cols + c] = v;
     }
 }
 
@@ -215,37 +241,71 @@ impl NN {
         }
     }
 
-    pub fn randomize_fixed(mut self) -> Self {
-        self.ws.iter_mut().for_each(|m| m.apply_randomize_fixed());
-        self.bs.iter_mut().for_each(|m| m.apply_randomize_fixed());
-        self.a.iter_mut().for_each(|m| m.apply_randomize_fixed());
-        self
-    }
-
-    pub fn apply_fill(&mut self, v: Float) {
-        self.ws.iter_mut().for_each(|m| m.apply_all(|_| v));
-        self.bs.iter_mut().for_each(|m| m.apply_all(|_| v));
-        self.a.iter_mut().for_each(|m| m.apply_all(|_| v));
-    }
-
     pub fn fmt_inputs(mut self, enable: bool) -> Self {
         self.fmt_inputs = enable;
         self
     }
 
-    pub fn forward(&mut self) {
-        for i in 0..self.count {
-            let out = self.a[i].get_dot(&self.ws[i]).sum(&self.bs[i]).all(sigmoid);
-            self.a[i + 1].apply_fill_from(&out);
-        }
+    pub fn randomized_range(mut self, range: Range<Float>) -> Self {
+        self.randomize_range(range);
+        self
+    }
+
+    pub fn randomized(mut self) -> Self {
+        self.randomize();
+        self
+    }
+
+    pub fn randomized_fixed(mut self) -> Self {
+        self.randomize_fixed();
+        self
+    }
+
+    pub fn filled_with(mut self, v: Float) -> Self {
+        self.fill(v);
+        self
+    }
+
+    pub fn with_input(mut self, inp: &Mat) -> Self {
+        self.set_input(inp);
+        self
+    }
+
+    pub fn randomize_range(&mut self, range: Range<Float>) {
+        let mut rng = rand::thread_rng();
+        let between = Uniform::from(range);
+        self.ws
+            .iter_mut()
+            .zip(self.bs.iter_mut())
+            .for_each(|(wm, bm)| {
+                wm.apply_all(|_| between.sample(&mut rng));
+                bm.apply_all(|_| between.sample(&mut rng));
+            });
+    }
+
+    pub fn randomize(&mut self) {
+        self.randomize_range(0.0..1.0)
+    }
+
+    pub fn randomize_fixed(&mut self) {
+        self.ws.iter_mut().for_each(|m| m.randomize_fixed());
+        self.bs.iter_mut().for_each(|m| m.randomize_fixed());
+    }
+
+    pub fn fill(&mut self, v: Float) {
+        self.ws.iter_mut().for_each(|m| m.apply_all(|_| v));
+        self.bs.iter_mut().for_each(|m| m.apply_all(|_| v));
+    }
+    pub fn set_input(&mut self, inp: &Mat) {
+        self.get_mut_input().fill_from(inp);
+    }
+
+    pub fn get_ref_input(&self) -> &Mat {
+        &self.a[0]
     }
 
     pub fn get_mut_input(&mut self) -> &mut Mat {
         &mut self.a[0]
-    }
-
-    pub fn set_input(&mut self, inp: &Mat) {
-        self.get_mut_input().apply_fill_from(inp);
     }
 
     pub fn get_ref_output(&self) -> &Mat {
@@ -256,15 +316,26 @@ impl NN {
         &mut self.a[self.count]
     }
 
-    pub fn get_output(&self) -> Mat {
-        self.get_ref_output().clone().fmt_name("output")
+    pub fn forward(&mut self) {
+        for i in 0..self.count {
+            let out = self.a[i]
+                .dot(&self.ws[i])
+                .sum(&self.bs[i])
+                .with_all(sigmoid);
+            self.a[i + 1].fill_from(&out);
+        }
+    }
+
+    pub fn forward_with(&mut self, input: &Mat) {
+        self.set_input(input);
+        self.forward();
     }
 
     pub fn cost(&mut self, ti: &Mat, to: &Mat) -> Float {
         let mut c = 0.;
         for i in 0..ti.rows {
-            let x = ti.get_row(i);
-            let y = to.get_row(i);
+            let x = ti.row(i);
+            let y = to.row(i);
             self.set_input(&x);
             self.forward();
             for j in 0..to.cols {
@@ -276,7 +347,7 @@ impl NN {
         c / ti.rows as Float
     }
 
-    pub fn finite_diff(&mut self, g: &mut Self, ti: &Mat, to: &Mat, eps: Float, ) {
+    pub fn finite_diff(&mut self, g: &mut Self, ti: &Mat, to: &Mat, eps: Float) {
         let c = self.cost(ti, to);
         for i in 0..self.count {
             for j in 0..self.ws[i].rows {
@@ -299,26 +370,10 @@ impl NN {
         }
     }
 
-    pub fn learn(&mut self, g: &Self, rate: Float) {
-        self.ws.iter_mut().zip(g.ws.iter()).for_each(|(m, gm)| {
-            m.elems
-                .iter_mut()
-                .zip(gm.elems.iter())
-                .for_each(|(e, ge)| *e -= ge * rate)
-        });
-
-        self.bs.iter_mut().zip(g.bs.iter()).for_each(|(m, gm)| {
-            m.elems
-                .iter_mut()
-                .zip(gm.elems.iter())
-                .for_each(|(e, ge)| *e -= ge * rate)
-        });
-    }
-
     pub fn backprop(&mut self, g: &mut Self, ti: &Mat, to: &Mat) {
         assert!(ti.rows == to.rows);
         assert!(self.get_ref_output().cols == to.cols);
-        g.apply_fill(0.);
+        g.fill(0.);
         let n = ti.rows;
 
         // i - current sample
@@ -327,7 +382,7 @@ impl NN {
         // k - previous activation
 
         for i in 0..n {
-            self.set_input(&ti.get_row(i));
+            self.set_input(&ti.row(i));
             self.forward();
 
             for j in 0..=self.count {
@@ -374,21 +429,20 @@ impl NN {
         }
     }
 
-    pub fn randomize_range(mut self, range: Range<Float>) -> Self {
-        let mut rng = rand::thread_rng();
-        let between = Uniform::from(range);
-        self.ws
-            .iter_mut()
-            .zip(self.bs.iter_mut())
-            .for_each(|(wm, bm)| {
-                wm.apply_all(|_| between.sample(&mut rng));
-                bm.apply_all(|_| between.sample(&mut rng));
-            });
-        self
-    }
+    pub fn learn(&mut self, g: &Self, rate: Float) {
+        self.ws.iter_mut().zip(g.ws.iter()).for_each(|(m, gm)| {
+            m.elems
+                .iter_mut()
+                .zip(gm.elems.iter())
+                .for_each(|(e, ge)| *e -= ge * rate)
+        });
 
-    pub fn randomize(self) -> Self {
-        self.randomize_range(0.0..1.0)
+        self.bs.iter_mut().zip(g.bs.iter()).for_each(|(m, gm)| {
+            m.elems
+                .iter_mut()
+                .zip(gm.elems.iter())
+                .for_each(|(e, ge)| *e -= ge * rate)
+        });
     }
 }
 

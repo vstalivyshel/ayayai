@@ -9,7 +9,7 @@ const RATE: Float = 1e-1;
 fn main() {
     let ti = Mat::new(4, 2).submat_from(D.1, 3);
     let to = Mat::new(4, 1).submat_from(&D.1[2..], 3);
-    let mut nn = NN::new(&[2, 2, 1]).randomize_fixed().fmt_inputs(true);
+    let mut nn = NN::new(&[2, 2, 1]).randomized_fixed().fmt_inputs(true);
     let mut g = nn.clone();
 
     for _ in 0..N {
@@ -24,7 +24,7 @@ fn main() {
     println!("{c}", c = nn.cost(&ti, &to));
     println!("-----------------------------------------");
     for i in 0..ti.rows {
-        let x = ti.get_row(i);
+        let x = ti.row(i);
         nn.set_input(&x);
         nn.forward();
         println!(
